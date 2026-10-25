@@ -67,9 +67,9 @@ def _ps(value) -> str:
 
 
 def windows_shortcuts(desktop: bool, remove: bool) -> None:
-    pythonw = ROOT / "venv" / "Scripts" / "pythonw.exe"
-    if not pythonw.is_file():
-        pythonw = Path(sys.executable).with_name("pythonw.exe")
+    pythonw = next((p for p in (ROOT / ".venv" / "Scripts" / "pythonw.exe",
+                                ROOT / "venv" / "Scripts" / "pythonw.exe") if p.is_file()),
+                   Path(sys.executable).with_name("pythonw.exe"))
     # WScript.Shell writes .lnk files without extra packages, and resolves the
     # real Start Menu and Desktop folders even when OneDrive redirects them.
     lines = ["$ErrorActionPreference = 'Stop'",
@@ -103,9 +103,9 @@ def linux_entry(remove: bool) -> None:
         path.unlink(missing_ok=True)
         print(f"removed {path}")
         return
-    python = ROOT / "venv" / "bin" / "python"
-    if not python.is_file():
-        python = Path(sys.executable)
+    python = next((p for p in (ROOT / ".venv" / "bin" / "python",
+                               ROOT / "venv" / "bin" / "python") if p.is_file()),
+                  Path(sys.executable))
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join([
         "[Desktop Entry]",

@@ -115,10 +115,10 @@ every output, and the settings described below as controls. It runs the same
 
 - **Windows:** double-click `gui/CorridorKey.bat`, or drag clips onto it
 - **Linux:** `gui/CorridorKey.sh`
-- **Any platform:** `python -m gui [clip_or_folder ...]` from the repository root
+- **Any platform:** `uv run python -m gui [clip_or_folder ...]` from the repository root
 
-The launchers install PySide6, the UI toolkit, into the venv the first time
-they run; otherwise `pip install PySide6-Essentials`. To add a Start Menu entry
+The launchers install PySide6, the UI toolkit, into `.venv` the first time
+they run; otherwise `uv pip install PySide6-Essentials`. To add a Start Menu entry
 and a desktop shortcut with the CorridorKey icon (an applications-menu entry on
 Linux), run this once:
 

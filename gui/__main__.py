@@ -3,9 +3,9 @@
     python -m gui [clip_or_folder ...]
 
 Clips, frame folders or folders of clips given on the command line are queued
-on start. The UI needs PySide6 on top of requirements.txt:
+on start. The UI needs PySide6 on top of the project dependencies:
 
-    pip install PySide6-Essentials
+    uv pip install PySide6-Essentials
 """
 import sys
 
