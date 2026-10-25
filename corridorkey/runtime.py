@@ -1017,6 +1017,12 @@ def _render_predictions_torch(meta: dict, outputs: set[str],
     return rendered
 
 
+def _is_out_of_memory(exc: BaseException) -> bool:
+    # MPS reports OOM as a plain RuntimeError, not torch.OutOfMemoryError (torch 2.9).
+    return isinstance(exc, torch.OutOfMemoryError) or (
+        isinstance(exc, RuntimeError) and "MPS backend out of memory" in str(exc))
+
+
 def run_inference(model, input_path: str, output_dir: str, cfg: InferenceConfig,
                   writer_cfg: WriterConfig, **kwargs):
     """Run inference; with cfg.auto_vram, an OOM restarts the clip with a cheaper profile."""
@@ -1024,8 +1030,9 @@ def run_inference(model, input_path: str, output_dir: str, cfg: InferenceConfig,
         try:
             return _run_inference_once(
                 model, input_path, output_dir, cfg, writer_cfg, **kwargs)
-        except torch.OutOfMemoryError:
-            if not cfg.auto_vram or (cfg.hann_chunk, cfg.low_vram) == (1, True):
+        except RuntimeError as exc:  # torch.OutOfMemoryError is a RuntimeError
+            if not _is_out_of_memory(exc) or not cfg.auto_vram or (
+                    cfg.hann_chunk, cfg.low_vram) == (1, True):
                 raise
             cfg.vram_ceiling_gb = cfg.vram_estimate_gb
             print(f"  [AUTO VRAM] Out of memory at hann_chunk={cfg.hann_chunk}, "

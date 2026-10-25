@@ -45,6 +45,11 @@ def safe_remove(path: str | os.PathLike | None) -> None:
         os.remove(path)
     except FileNotFoundError:
         pass
+    except PermissionError:
+        # Windows can't delete a file that is still memory-mapped, e.g. while an
+        # exception's traceback pins the memmap. Don't mask that exception; the
+        # next run removes stale temp files before reusing them.
+        print(f"  [WARNING] could not remove temp file (still in use): {path}")
 
 
 def none_path(path: str | None) -> str | None:
