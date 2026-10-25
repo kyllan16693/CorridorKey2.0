@@ -1,6 +1,10 @@
+import pytest
 import torch
 
 from corridorkey.blocks import LayerNorm2d, RMSNorm
+
+pytestmark = pytest.mark.skipif(
+    not torch.cuda.is_available(), reason="needs a CUDA or ROCm GPU")
 
 
 def _under_bf16_autocast(module, x):
