@@ -99,7 +99,7 @@ class RuntimePaths:
         if missing:
             raise FileNotFoundError(
                 "missing runtime asset(s): " + ", ".join(str(p) for p in missing)
-                + "\nRun `python scripts/download_weights.py` to fetch them.")
+                + "\nRun `uv run scripts/download_weights.py` to fetch them.")
 
 
 @dataclass

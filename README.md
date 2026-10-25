@@ -19,45 +19,51 @@ Any business or research inquiries for Zac can be directed to z.brooks.harris@gm
 ## Setup
 
 You need an NVIDIA GPU (currently RTX 30-series or newer), an AMD GPU with a Linux
-ROCm installation, or an Apple Silicon Mac with an MPS-enabled PyTorch build, plus
-`ffmpeg` on your PATH and a Python environment (3.12 is the latest recommended). For
-NVIDIA, allow at least 4 GB of VRAM for footage up to 1440p or 6 GB for 4K. The
-initial AMD support target is Linux ROCm; Windows ROCm is not supported yet. On
-Apple Silicon, 32 GB of unified memory is the practical baseline; smaller Macs
-should start with low-VRAM mode and short Hann windows. See
-[Long Clips And Low VRAM](#long-clips-and-low-vram).
-This package was tested with:
+ROCm installation, or an Apple Silicon Mac, plus `ffmpeg` on your PATH and
+[uv](https://docs.astral.sh/uv/getting-started/installation/). For NVIDIA, allow at
+least 4 GB of VRAM for footage up to 1440p or 6 GB for 4K. The initial AMD support
+target is Linux ROCm; Windows ROCm is not supported yet. On Apple Silicon, 32 GB of
+unified memory is the practical baseline; smaller Macs should start with low-VRAM
+mode and short Hann windows. See [Long Clips And Low VRAM](#long-clips-and-low-vram).
+
+uv installs the right Python and every dependency, including `torch==2.9.1` and
+`torchvision==0.24.1` (CUDA-enabled on Linux and Windows, MPS-enabled on macOS), at
+the exact versions pinned in `uv.lock`. From the repository root, create the
+environment and download the model weights (about 5 GB):
 
 ```
-torch==2.9.1
-torchvision==0.24.1
+uv sync
+uv run scripts/download_weights.py
 ```
 
-From the repository root, create an environment, install PyTorch and the
-remaining dependencies, and download the model weights (about 5 GB).
+On Windows, PyTorch also needs the
+[Microsoft Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe).
 
-NVIDIA CUDA:
-
-```
-python -m venv venv
-source venv/bin/activate
-# NVIDIA CUDA:
-pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cu128
-# AMD Linux ROCm:
-pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/rocm6.4
-pip install -r requirements.txt
-python scripts/download_weights.py
-```
-
-Apple Silicon (native arm64 Python; do not run the terminal under Rosetta):
+To use a different PyTorch build (another CUDA version, or ROCm for AMD GPUs, e.g.
+`https://download.pytorch.org/whl/rocm6.4`), install it into the environment after
+`uv sync`:
 
 ```
-python3 -m venv venv
-source venv/bin/activate
-pip install torch==2.9.1 torchvision==0.24.1
-pip install -r requirements.txt
-python scripts/download_weights.py
-python infer.py --device mps --help
+uv pip install --reinstall-package torch --reinstall-package torchvision torch torchvision --index-url <your PyTorch index>
+```
+
+Then set `UV_NO_SYNC=1` so `uv run` and the drag-and-drop launchers keep it
+instead of restoring the pinned build. Set it for the current shell and
+permanently, or a launcher started from Explorer or a file manager won't see it:
+
+```
+# Windows (PowerShell)
+$env:UV_NO_SYNC = "1"; setx UV_NO_SYNC 1
+
+# Linux (the ~/.profile line takes effect at next login)
+export UV_NO_SYNC=1; echo 'export UV_NO_SYNC=1' >> ~/.profile
+```
+
+On Apple Silicon, use a native arm64 terminal (not Rosetta); `uv sync` installs
+the MPS-enabled PyTorch build. Check it with:
+
+```
+uv run infer.py --device mps --help
 ```
 
 MPS execution is strict: unsupported Metal operations raise an error rather
@@ -88,7 +94,7 @@ or a folder of clips onto the launcher in the repository root:
   the clip into the terminal when asked)
 
 It walks you through the inference mode, outputs, and GPU memory profile, then
-runs the job. The launcher uses the `venv` created during setup if it exists.
+runs the job. The launcher runs through `uv` (or the `.venv` created during setup).
 It also picks up companion hint files next to the input automatically
 (`<clip>FrameHint.png` for a first-frame hint, `<clip>_AlphaHint.mp4` for a
 full hint video).
@@ -96,7 +102,7 @@ full hint video).
 You can also start the same guided session directly:
 
 ```
-python run_interactive.py /path/to/clip.mp4
+uv run run_interactive.py /path/to/clip.mp4
 ```
 
 ## Quick Start
@@ -104,7 +110,7 @@ python run_interactive.py /path/to/clip.mp4
 From the repository root:
 
 ```
-python infer.py \
+uv run infer.py \
   --input /path/to/input.mp4 \
   --output_dir /path/to/output
 ```
@@ -143,7 +149,7 @@ the model to decide for itself.
 ### No Hint
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_no_hint
 ```
@@ -161,7 +167,7 @@ Tradeoffs:
 ### First-Frame Hint
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_frame1_hint \
   --hint_first_frame frame_0001_matte.png \
@@ -187,7 +193,7 @@ Tradeoffs:
 ### Full Hint Video
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_full_hint \
   --hint_video hint_matte_video.mp4 \
@@ -211,7 +217,7 @@ Tradeoffs:
 ### Full Hint Video Without Carry
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_full_hint_no_carry \
   --hint_video hint_matte_video.mp4 \
@@ -244,7 +250,7 @@ Practical values:
 For carried Hann hints, use `--carry_hint_quality`. The default is `0.95`.
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_frame1_hint \
   --hint_first_frame frame_0001_matte.png \
@@ -296,7 +302,7 @@ What the settings mean:
 Example:
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_window_8 \
   --hann_chunk 8 \
@@ -319,7 +325,7 @@ Available output choices:
 Select outputs explicitly:
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_review \
   --outputs alpha fg checker cutout
@@ -334,7 +340,7 @@ more ffmpeg encoding. For fastest normal use, keep the default `alpha fg`. Add
 Use `--despill_strength` (value from `0.0` for no despill to `1.0` for full despill, defaults to `0.5`) to configure the despill amount applied to the `checker` and `cutout` outputs.
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_despill \
   --outputs checker cutout \
@@ -400,7 +406,7 @@ at most ~0.05% on top of that; `float` adds none.
 Typical HDR round trip from linear EXR plates:
 
 ```
-python infer.py \
+uv run infer.py \
   --input /path/to/linear_exr_frames \
   --frame_dir_linear \
   --frame_dir_fps 24 \
@@ -433,7 +439,7 @@ unclipped HDR.
 Override these as needed for your pipeline. For example:
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_encoded \
   --ffmpeg_codec libx264 \
@@ -474,7 +480,7 @@ The normal path streams video and does not intentionally hold an entire long
 clip in RAM. To force low-VRAM mode yourself, add:
 
 ```
-python infer.py \
+uv run infer.py \
   --input long_shot.mp4 \
   --output_dir out_low_vram \
   --low_vram \
@@ -512,7 +518,7 @@ Use the defaults unless you are actively tuning memory behavior.
 read in sorted filename order. Supported extensions are EXR, PNG, JPG, and JPEG.
 
 ```
-python infer.py \
+uv run infer.py \
   --input /path/to/frames \
   --frame_dir_fps 24 \
   --output_dir out_frames
@@ -527,7 +533,7 @@ Frame directories are treated as display-coded by default. If the incoming image
 Example:
 
 ```
-python infer.py \
+uv run infer.py \
   --input /path/to/linear_exr_frames \
   --frame_dir_fps 24 \
   --frame_dir_linear \
@@ -539,7 +545,7 @@ python infer.py \
 For quick tests, process only part of a clip:
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_test \
   --num_frames 100 \
@@ -623,13 +629,13 @@ mismatches raise errors instead of falling back to a different behavior.
 No hint, fastest standard outputs:
 
 ```
-python infer.py --input shot.mp4 --output_dir out_no_hint
+uv run infer.py --input shot.mp4 --output_dir out_no_hint
 ```
 
 First-frame hint with default carry:
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_frame1 \
   --hint_first_frame matte_frame_0001.png \
@@ -639,7 +645,7 @@ python infer.py \
 Full hint video, trusting the provided hint on every pass:
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_full_hint \
   --hint_video hint.mp4 \
@@ -650,7 +656,7 @@ python infer.py \
 Review render with checker and cutout:
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_review \
   --hint_first_frame matte_frame_0001.png \
@@ -660,7 +666,7 @@ python infer.py \
 Lower-memory 8-frame windows:
 
 ```
-python infer.py \
+uv run infer.py \
   --input shot.mp4 \
   --output_dir out_lowmem_window \
   --hint_first_frame matte_frame_0001.png \
