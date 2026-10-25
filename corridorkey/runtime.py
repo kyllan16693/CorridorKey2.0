@@ -265,6 +265,13 @@ def select_accelerator(requested: str = "auto") -> torch.device:
     raise RuntimeError("CorridorKey requires a CUDA or MPS GPU; CPU fallback is disabled.")
 
 
+def _async_copy(device: torch.device) -> bool:
+    # Non-blocking host-to-MPS copies can run after the temporary host tensor is
+    # freed, so a band of a feature map arrives corrupted on some frames (seen
+    # on an M-series Mac, PyTorch 2.9). Only CUDA/ROCm copies are made async.
+    return device.type == "cuda"
+
+
 def _inference_dtype(device: torch.device) -> torch.dtype:
     # Match the trained CUDA runtime's dynamic range. Current MPS supports
     # bf16 autocast, which avoids fp16 overflow on scene-linear HDR plates.
@@ -569,7 +576,7 @@ def precompute_rvm_to_memmap(model, source, meta, rvm_path: Path,
             future = pool.submit(_next_or_none, chunks)
             t0, _model, display = item
             Tc = display.shape[0]
-            rgb = display.unsqueeze(0).to(device, non_blocking=True).float()
+            rgb = display.unsqueeze(0).to(device, non_blocking=_async_copy(device)).float()
             rgb_rvm = F.interpolate(
                 rgb.reshape(Tc, 3, H, W), size=(H_e, W_e),
                 mode="bilinear", align_corners=False,
@@ -627,7 +634,7 @@ def precompute_foundations_to_memmap(model, source, meta, prefix: Path,
             t0, _model, display = item
             Tc = display.shape[0]
             rgb = display.unsqueeze(0).to(
-                device, dtype=_inference_dtype(device), non_blocking=True)
+                device, dtype=_inference_dtype(device), non_blocking=_async_copy(device))
             rgb_radio, rgb_moge = _build_foundation_inputs(rgb)
             with _autocast(device):
                 ff = model.foundations(
@@ -785,14 +792,14 @@ def hann_stage1_stream(model, source, meta, *, reader_cls, reader_kind: str,
 
             compute_dtype = _inference_dtype(device)
             rgb_c = model_chunk.unsqueeze(0).to(
-                device, dtype=compute_dtype, non_blocking=True)
-            hint_c = hint_cpu.to(device, dtype=compute_dtype, non_blocking=True)
+                device, dtype=compute_dtype, non_blocking=_async_copy(device))
+            hint_c = hint_cpu.to(device, dtype=compute_dtype, non_blocking=_async_copy(device))
             hint_quality_c = hint_quality_cpu.to(
-                device, dtype=compute_dtype, non_blocking=True)
+                device, dtype=compute_dtype, non_blocking=_async_copy(device))
             ff = rgb_radio = rgb_moge = None
             if foundation_paths is None:
                 rgb_found = display_chunk.unsqueeze(0).to(
-                    device, dtype=compute_dtype, non_blocking=True)
+                    device, dtype=compute_dtype, non_blocking=_async_copy(device))
                 rgb_radio, rgb_moge = _build_foundation_inputs(rgb_found)
                 with _autocast(device):
                     ff = model.foundations(
@@ -803,13 +810,13 @@ def hann_stage1_stream(model, source, meta, *, reader_cls, reader_kind: str,
                 moge_feat = ff["moge"].reshape(1, Tc, -1, H // 64, W // 64)
             else:
                 moge_feat = torch.from_numpy(np.asarray(moge_map[t0:t1]).copy())
-                moge_feat = moge_feat.unsqueeze(0).to(device, non_blocking=True).float()
+                moge_feat = moge_feat.unsqueeze(0).to(device, non_blocking=_async_copy(device)).float()
                 cradio_feat = torch.from_numpy(np.asarray(cradio_map[t0:t1]).copy())
-                cradio_feat = cradio_feat.unsqueeze(0).to(device, non_blocking=True).float()
+                cradio_feat = cradio_feat.unsqueeze(0).to(device, non_blocking=_async_copy(device)).float()
             rvm_feat = None
             if rvm_map is not None:
                 rvm_feat = torch.from_numpy(np.asarray(rvm_map[t0:t1]).copy())
-                rvm_feat = rvm_feat.unsqueeze(0).to(device, non_blocking=True).float()
+                rvm_feat = rvm_feat.unsqueeze(0).to(device, non_blocking=_async_copy(device)).float()
             with _autocast(device):
                 s1 = model.stage1(
                     rgb_c, hint_c, moge_feat, cradio_feat=cradio_feat,
@@ -1207,10 +1214,10 @@ def _run_inference_once(model, input_path: str, output_dir: str, cfg: InferenceC
                 sub = items[offset:offset + stage2_batch]
                 rgb_t = torch.stack([item[2] for item in sub], dim=0)
                 rgb_t = rgb_t.unsqueeze(0).to(
-                    device, dtype=_inference_dtype(device), non_blocking=True)
+                    device, dtype=_inference_dtype(device), non_blocking=_async_copy(device))
                 baton_np = np.stack([item[1] for item in sub], axis=0)
                 baton_t = torch.from_numpy(baton_np).unsqueeze(0)
-                baton_t = baton_t.to(device, non_blocking=True).float()
+                baton_t = baton_t.to(device, non_blocking=_async_copy(device)).float()
                 with torch.inference_mode(), _autocast(device):
                     logits = model.stage2(rgb_t, baton_t)
                     if isinstance(logits, tuple):
