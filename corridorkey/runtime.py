@@ -192,6 +192,9 @@ class _InlineProgress:
                 if hours else f"{minutes:02d}:{seconds:02d}")
 
     def _render(self, *, force: bool = False) -> None:
+        # Piped output (the desktop app, logs) gets the plain milestone lines instead.
+        if not sys.stdout.isatty():
+            return
         now = time.perf_counter()
         if not force and now - self.last_rendered < 0.2:
             return
@@ -843,6 +846,9 @@ def hann_stage1_stream(model, source, meta, *, reader_cls, reader_kind: str,
             del rgb_c, hint_c, hint_quality_c, hint_cpu, hint_quality_cpu
             del model_chunk, display_chunk, review_chunk
             flush_before(next_start)
+            if not sys.stdout.isatty():
+                # gui/runner.py tracks stage 1 progress from these lines.
+                print(f"      window {i + 1}/{len(starts)} [{t0}:{t1}]", flush=True)
         _synchronize(device)
         flush_before(T_all + 1)
     finally:

@@ -128,11 +128,19 @@ def main():
                     default=2048)
     args = ap.parse_args()
 
-    device = select_accelerator(args.device)
-    if device.type == "cuda":
-        print(describe_accelerator(resolve_accelerator(args.gpu)))
+    if args.gpu != "auto":
+        # An explicit vendor never falls back to another backend, MPS included.
+        if args.device == "mps":
+            raise SystemExit("--gpu nvidia/amd and --device mps can't be combined.")
+        accelerator = resolve_accelerator(args.gpu)
+        device = accelerator.device
+        print(describe_accelerator(accelerator))
     else:
-        print(f"Using accelerator: {device}")
+        device = select_accelerator(args.device)
+        if device.type == "cuda":
+            print(describe_accelerator(resolve_accelerator("auto")))
+        else:
+            print(f"Using accelerator: {device}")
     require_ffmpeg(args.ffmpeg_bin)
     package_root = Path(__file__).resolve().parent
     paths = RuntimePaths.from_package(package_root, args.weights)

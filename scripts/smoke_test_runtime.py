@@ -45,9 +45,17 @@ def main():
     print(f"checkpoint ok: {paths.weights} ({paths.weights.stat().st_size / 1e9:.2f} GB)")
     print(f"state tensors: {len(state)}")
     if args.load_model:
-        device = select_accelerator(args.device)
-        if device.type == "cuda":
-            print(describe_accelerator(resolve_accelerator(args.gpu)))
+        if args.gpu != "auto":
+            # An explicit vendor never falls back to another backend, MPS included.
+            if args.device == "mps":
+                raise SystemExit("--gpu nvidia/amd and --device mps can't be combined.")
+            accelerator = resolve_accelerator(args.gpu)
+            device = accelerator.device
+            print(describe_accelerator(accelerator))
+        else:
+            device = select_accelerator(args.device)
+            if device.type == "cuda":
+                print(describe_accelerator(resolve_accelerator("auto")))
         model = load_model(paths, device=device)
         print(f"model ok: d16={model.stage1.d_16}, "
               f"cradio={model.stage1.cradio_dim}, "

@@ -123,7 +123,7 @@ and a desktop shortcut with the CorridorKey icon (an applications-menu entry on
 Linux), run this once:
 
 ```
-python -m gui.shortcut
+uv run python -m gui.shortcut
 ```
 
 Companion hint files are picked up the same way the drag-and-drop launcher
@@ -143,7 +143,7 @@ By default, `infer.py` automatically selects an available CUDA or Linux ROCm
 backend. Use `--gpu nvidia` or `--gpu amd` to require a specific backend:
 
 ```
-python infer.py --gpu amd \
+uv run infer.py --gpu amd \
   --input /path/to/input.mp4 \
   --output_dir /path/to/output
 ```
@@ -152,7 +152,7 @@ An explicit backend never falls back to the other vendor. Verify the selected
 PyTorch build and visible GPU with:
 
 ```
-python scripts/smoke_test_runtime.py --load_model --gpu amd
+uv run scripts/smoke_test_runtime.py --load_model --gpu amd
 ```
 
 This runs native-resolution inference with no external hint. By default it
@@ -495,8 +495,8 @@ On small cards it goes down to windows of only a few frames, or a single
 frame, which gives up temporal context in stage 1 to save memory. Results
 remain good, with somewhat less frame-to-frame consistency than larger windows.
 
-These come from measurements on synthetic test clips; other software using the
-GPU use by other applications reduces what is available. If you hit an
+These come from measurements on synthetic test clips; GPU use by other
+applications reduces what is available. If you hit an
 accelerator out-of-memory error, pass
 `--low_vram` with a smaller `--hann_chunk` yourself.
 
