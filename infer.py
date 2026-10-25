@@ -13,6 +13,12 @@ os.environ["TRANSFORMERS_OFFLINE"] = "1"
 # Never hide an unsupported Metal operator by running it on the CPU.  This
 # must be set before importing torch.
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "0"
+# AMD's Windows ROCm build can crash ("unspecified launch failure") while MIOpen
+# benchmarks convolution kernels for a shape it hasn't tuned yet (seen on an RX
+# 5700 XT with an empty MIOpen cache). FAST mode picks kernels without that
+# benchmark, at the same speed and accuracy here. No effect on NVIDIA.
+if os.name == "nt":
+    os.environ.setdefault("MIOPEN_FIND_MODE", "FAST")
 
 from pathlib import Path
 
