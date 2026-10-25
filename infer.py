@@ -4,11 +4,15 @@ from __future__ import annotations
 import argparse
 import os
 import tempfile
+import time
 
 # Before torch loads: avoids allocator fragmentation that defeats VRAM auto-sizing.
 os.environ.setdefault("PYTORCH_ALLOC_CONF", "expandable_segments:True")
 os.environ["HF_HUB_OFFLINE"] = "1"
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
+# Never hide an unsupported Metal operator by running it on the CPU.  This
+# must be set before importing torch.
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "0"
 
 from pathlib import Path
 
@@ -18,6 +22,7 @@ from corridorkey.runtime import (
     RuntimePaths,
     WriterConfig,
     load_model,
+    select_accelerator,
     run_inference,
 )
 from corridorkey.video_io import require_ffmpeg
@@ -45,11 +50,14 @@ def _parse_outputs(values):
 
 
 def main():
+    total_started = time.perf_counter()
     ap = argparse.ArgumentParser(
         description="CorridorKey v2 native-resolution raw-video inference")
     ap.add_argument("--input", required=True,
                     help="Input video file or directory of image frames.")
     ap.add_argument("--output_dir", required=True)
+    ap.add_argument("--device", choices=("auto", "cuda", "mps"), default="auto",
+                    help="Inference accelerator. Default: CUDA when available, otherwise MPS.")
     ap.add_argument("--weights", default=None,
                     help="Runtime checkpoint (.safetensors or legacy .pt). "
                          "Defaults to weights/corridorkey_v2.safetensors.")
@@ -120,8 +128,11 @@ def main():
                     default=2048)
     args = ap.parse_args()
 
-    accelerator = resolve_accelerator(args.gpu)
-    print(describe_accelerator(accelerator))
+    device = select_accelerator(args.device)
+    if device.type == "cuda":
+        print(describe_accelerator(resolve_accelerator(args.gpu)))
+    else:
+        print(f"Using accelerator: {device}")
     require_ffmpeg(args.ffmpeg_bin)
     package_root = Path(__file__).resolve().parent
     paths = RuntimePaths.from_package(package_root, args.weights)
@@ -169,7 +180,7 @@ def main():
         output_format=args.output_format,
         exr_dtype=args.exr_dtype,
     )
-    model = load_model(paths, device=accelerator.device)
+    model = load_model(paths, device=device)
     run_inference(
         model,
         args.input,
@@ -178,8 +189,11 @@ def main():
         writer_cfg,
         initial_hint_path=args.hint_first_frame,
         hint_video_path=args.hint_video,
-        device=accelerator.device,
+        device=device,
     )
+    elapsed = time.perf_counter() - total_started
+    print(f"Total runtime (including model load): {elapsed / 60:.1f} min "
+          f"({elapsed:.1f} s)")
 
 
 if __name__ == "__main__":
