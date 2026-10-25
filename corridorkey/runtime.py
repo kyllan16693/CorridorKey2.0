@@ -1224,7 +1224,7 @@ def _run_inference_once(model, input_path: str, output_dir: str, cfg: InferenceC
             device=device)
 
         if cfg.low_vram:
-            _phase2_setup(model, device)
+            _phase2_setup(model)
             baton = np.memmap(
                 baton_path, dtype=np.float16, mode="r",
                 shape=(T_all, model.stage1.d_16, H // 16, W // 16))
