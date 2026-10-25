@@ -19,8 +19,11 @@ Any business or research inquiries for Zac can be directed to z.brooks.harris@gm
 ## Setup
 
 You need an NVIDIA GPU (currently RTX 30-series or newer) with at least 4 GB of VRAM
-for footage up to 1440p, or 6 GB for 4K, `ffmpeg` on your PATH, and a Python
-environment (3.12 is the latest recommended) with CUDA-enabled PyTorch installed. On smaller cards, see [Long Clips And Low VRAM](#long-clips-and-low-vram).
+for footage up to 1440p, or 6 GB for 4K, or an AMD GPU with a Linux ROCm
+installation, `ffmpeg` on your PATH, and a Python environment (3.12 is the latest
+recommended) with a matching accelerator-enabled PyTorch installed. The initial AMD
+support target is Linux ROCm; Windows ROCm is not supported yet. On smaller cards, see
+[Long Clips And Low VRAM](#long-clips-and-low-vram).
 This package was tested with:
 
 ```
@@ -34,7 +37,10 @@ remaining dependencies, and download the model weights (about 5 GB):
 ```
 python -m venv venv
 source venv/bin/activate
+# NVIDIA CUDA:
 pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cu128
+# AMD Linux ROCm:
+pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/rocm6.4
 pip install -r requirements.txt
 python scripts/download_weights.py
 ```
@@ -79,6 +85,22 @@ From the repository root:
 python infer.py \
   --input /path/to/input.mp4 \
   --output_dir /path/to/output
+```
+
+By default, `infer.py` automatically selects an available CUDA or Linux ROCm
+backend. Use `--gpu nvidia` or `--gpu amd` to require a specific backend:
+
+```
+python infer.py --gpu amd \
+  --input /path/to/input.mp4 \
+  --output_dir /path/to/output
+```
+
+An explicit backend never falls back to the other vendor. Verify the selected
+PyTorch build and visible GPU with:
+
+```
+python scripts/smoke_test_runtime.py --load_model --gpu amd
 ```
 
 This runs native-resolution inference with no external hint. By default it
